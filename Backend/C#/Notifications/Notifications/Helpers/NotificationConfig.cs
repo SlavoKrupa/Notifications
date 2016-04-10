@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Notifications.DbContext;
 using Npgsql;
 using WebSocketSharp.Server;
+using Newtonsoft.Json.Converters;
 
 namespace Notifications.Helpers
 {
@@ -35,20 +36,22 @@ namespace Notifications.Helpers
         ///     Starts WebSocket server on localhost port 8080.
         /// </summary>
         /// <remarks>
-        ///     Also endpoint with <c>/Echo</c> path is registered
+        ///     Also endpoint with <c>/CSharp</c> path is registered
         /// </remarks>
         public static void StartWebSocketServer()
         {
             _webSocketServer = new WebSocketServer(IPAddress.Parse("127.0.0.1"), 8080);
-            _webSocketServer.AddWebSocketService<Echo>("/Echo");
+            _webSocketServer.AddWebSocketService<Echo>("/CSharp");
             _webSocketServer.Start();
         }
 
         private static void OnNotification(object sender, NpgsqlNotificationEventArgs e)
         {
             var notification = JsonConvert.DeserializeObject<Notification>(e.AdditionalInformation);
+            // yes ugly timezone hack :(
+            notification.CreationTime = notification.CreationTime.AddHours(-2);
             notification.ReceivingTimeBackend = DateTime.Now;
-            _webSocketServer.WebSocketServices["/Echo"].Sessions.Broadcast(JsonConvert.SerializeObject(notification));
+            _webSocketServer.WebSocketServices["/CSharp"].Sessions.Broadcast(JsonConvert.SerializeObject(notification, new IsoDateTimeConverter()));
         }
 
         private class Echo : WebSocketBehavior

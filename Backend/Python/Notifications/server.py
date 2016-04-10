@@ -13,14 +13,14 @@ import tornado.websocket
 
 from tornado.options import define, options, parse_command_line
 
-dbname = 'notifications'
+dbname = 'postgres'
 host = '127.0.0.1'
 user = 'postgres'
 password = 'password'
 
 dsn = 'dbname=%s host=%s user=%s password=%s' % (dbname, host, user, password)
 
-define("port", default=8080, help="run on the given port", type=int)
+define("port", default=5432, help="run on the given port", type=int)
 
 
 def db_listen(q):
@@ -67,9 +67,9 @@ class WSHandler(tornado.websocket.WebSocketHandler):
 
 
 application = tornado.web.Application([
-    (r'/data', WSHandler),
+    (r'/Python', WSHandler),
 ])
 
 if __name__ == "__main__":
-    application.listen(8080)
+    application.listen(8081)
     tornado.ioloop.IOLoop.instance().start()
