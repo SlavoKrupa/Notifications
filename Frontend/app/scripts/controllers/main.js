@@ -10,6 +10,7 @@
 angular.module('Notifications')
   .service('webSocketFactory',function($websocket) {
     var callBack = function(){};
+    var errorCallBack =  function(){};
     function sharedCallback(source,message) {
       var receivedData = JSON.parse(message.data);
       receivedData.db_creation = new Date(receivedData.db_creation);
@@ -42,8 +43,14 @@ angular.module('Notifications')
       openWs:function(language) {
         webSockets[language] = $websocket (urls[language]);
         webSockets[language].onOpen(function() {console.log('websocket to ' + language+' opened!');});
-        webSockets[language].onClose(function() {console.log('websocket to ' + language+' closed!');});
-        webSockets[language].onError(function() {console.log('Error on ' + language+' socket!');});
+        webSockets[language].onClose(function() {
+          console.log('websocket to ' + language+' closed!');
+          errorCallBack(language);
+        });
+        webSockets[language].onError(function() {
+          console.log('Error on ' + language+' socket!');
+          errorCallBack(language);
+        });
         webSockets[language].onMessage(function(message) {sharedCallback(language,message);});
 
 
@@ -51,11 +58,24 @@ angular.module('Notifications')
       },
       closeWs:function(language) {
         webSockets[language].close(true);
+      },
+      setWebSocketErrorCallback:function (newCallback) {
+        if(typeof newCallback === 'function') {
+          errorCallBack=newCallback;
+        } else {
+          throw 'Callback must be function.';
+        }
+
       }
     };
   })
   .controller('MainCtrl',['webSocketFactory','$scope',function (webSocketFactory,$scope) {
     $scope.SUPPORTED_LANGUAGES = ['C#','Java','Python'];
+    webSocketFactory.setWebSocketErrorCallback(function(language) {
+      $scope.results[language].isRunning = OFF_CLASS;
+      $scope.$digest();
+
+    });
     webSocketFactory.setCallBack( function(newData) {
       var allData = $scope.results[newData.source];
       allData.lastOccurrences.push(newData);
@@ -71,6 +91,8 @@ angular.module('Notifications')
       allData.averageDB2BE = newAverageDB2BE;
 
   	});
+
+
     var OFF_CLASS = 'btn-danger';
     var ON_CLASS = 'btn-success';
     $scope.results = {};
@@ -95,13 +117,7 @@ angular.module('Notifications')
       var isTurnedOn = isOnline(language);
       if(isTurnedOn) {
         webSocketFactory.closeWs(language);
-        $scope.results[language] = {
-          isRunning: OFF_CLASS,
-          count:0,
-          averageDB2BE:0,
-          averageBE2FE:0,
-          lastOccurrences:[]
-        };
+        $scope.results[language].isRunning = OFF_CLASS;
       } else {
         webSocketFactory.openWs(language);
         $scope.results[language].isRunning = ON_CLASS;
