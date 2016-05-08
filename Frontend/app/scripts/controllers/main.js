@@ -71,6 +71,11 @@ angular.module('Notifications')
   })
   .controller('MainCtrl',['webSocketFactory','$scope',function (webSocketFactory,$scope) {
     $scope.SUPPORTED_LANGUAGES = ['C#','Java','Python'];
+    webSocketFactory.setWebSocketErrorCallback(function(language) {
+      $scope.results[language].isRunning = OFF_CLASS;
+      $scope.$digest();
+
+    });
     webSocketFactory.setCallBack( function(newData) {
       var allData = $scope.results[newData.source];
       allData.lastOccurrences.push(newData);
@@ -86,10 +91,7 @@ angular.module('Notifications')
       allData.averageDB2BE = newAverageDB2BE;
 
   	});
-    webSocketFactory.setWebSocketErrorCallback(function(language) {
-      $scope.results[language].isRunning = OFF_CLASS;
 
-    });
 
     var OFF_CLASS = 'btn-danger';
     var ON_CLASS = 'btn-success';
