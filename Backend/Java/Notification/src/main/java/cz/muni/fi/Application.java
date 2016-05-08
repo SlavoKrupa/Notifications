@@ -1,20 +1,24 @@
+package cz.muni.fi;
+
 import org.glassfish.tyrus.server.Server;
 
 import javax.websocket.DeploymentException;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.sql.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Application {
 
-    private static String url = "jdbc:postgresql://localhost:5432/test";
-    private static String username = "postgres";
-    private static String password = "admin123";
+    private static final String URL = "jdbc:postgresql://localhost:5432/postgres";
+    private static final String USERNAME = "postgres";
+    private static final String PASSWORD = "password";
 
     public static void main(String[] args) {
         try {
             //create connection with DB
-            Connection conn = DriverManager.getConnection(url, username, password);
+            Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
             if (conn != null) {
                 System.out.println("Successfully connected to DB");
             }
@@ -24,13 +28,13 @@ public class Application {
             listener.start();
 
             //start websocket server endpoint
-            Server server = new Server("127.0.0.1", 8080, "", WebSocketServer.class);
+            Server server = new Server("127.0.0.1", 8082, "", WebSocketServer.class);
             server.start();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            Logger.getLogger(WebSocketServer.class.getName()).log(Level.SEVERE, null, e);
         } catch (DeploymentException e) {
-            e.printStackTrace();
+            Logger.getLogger(WebSocketServer.class.getName()).log(Level.SEVERE, null, e);
         }
     }
 }

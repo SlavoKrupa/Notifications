@@ -1,3 +1,5 @@
+package cz.muni.fi;
+
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 

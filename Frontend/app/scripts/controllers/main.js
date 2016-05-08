@@ -12,7 +12,6 @@ angular.module('Notifications')
     var callBack = function(){};
     function sharedCallback(source,message) {
       var receivedData = JSON.parse(message.data);
-      console.log(receivedData);
       receivedData.db_creation = new Date(receivedData.db_creation);
       receivedData.backend_receiving = new Date(receivedData.backend_receiving);
       receivedData.frontend_receiving= new Date();
@@ -24,18 +23,12 @@ angular.module('Notifications')
           callBack(newItem);
     }
     // Open a WebSocket connection
-    var cSharpDataStream = $websocket ('ws://127.0.0.1:8080/CSharp');
-    cSharpDataStream.onOpen(function() {console.log('websocket to C# opened!')});
-    cSharpDataStream.onError(function() {console.log('error on C# websocket!')});
-    cSharpDataStream.onMessage(function(message) {sharedCallback('C#',message);});
-    var pythonDataStream = $websocket ('ws://127.0.0.1:8081/Python');
-    pythonDataStream.onMessage(function(message) {sharedCallback('Python',message);});
-    pythonDataStream.onOpen(function() {console.log('websocket to Python opened!')});
-    // uncomment when java is done
-    // var javaDataStream = $websocket ('wss://127.0.0.1/Java');
-    // javaDataStream.onMessage(function(message) {sharedCallback('Java',message);});
-
-
+    var webSockets = {};
+    var urls = {
+      'C#' : 'ws://127.0.0.1:8080/CSharp',
+      'Java' : 'ws://127.0.0.1:8082/java',
+      'Python': 'ws://127.0.0.1:8081/Python'
+    };
 
     return {
       setCallBack: function(newCallback){
@@ -45,10 +38,24 @@ angular.module('Notifications')
           throw 'Callback must be function.';
         }
 
+      },
+      openWs:function(language) {
+        webSockets[language] = $websocket (urls[language]);
+        webSockets[language].onOpen(function() {console.log('websocket to ' + language+' opened!');});
+        webSockets[language].onClose(function() {console.log('websocket to ' + language+' closed!');});
+        webSockets[language].onError(function() {console.log('Error on ' + language+' socket!');});
+        webSockets[language].onMessage(function(message) {sharedCallback(language,message);});
+
+
+
+      },
+      closeWs:function(language) {
+        webSockets[language].close(true);
       }
     };
   })
   .controller('MainCtrl',['webSocketFactory','$scope',function (webSocketFactory,$scope) {
+    $scope.SUPPORTED_LANGUAGES = ['C#','Java','Python'];
     webSocketFactory.setCallBack( function(newData) {
       var allData = $scope.results[newData.source];
       allData.lastOccurrences.push(newData);
@@ -64,28 +71,41 @@ angular.module('Notifications')
       allData.averageDB2BE = newAverageDB2BE;
 
   	});
+    var OFF_CLASS = 'btn-danger';
+    var ON_CLASS = 'btn-success';
+    $scope.results = {};
+    $scope.clearData= function () {
+      angular.forEach($scope.SUPPORTED_LANGUAGES, function(language) {
+        $scope.results[language] = {
+          isRunning: isOnline (language) ? ON_CLASS : OFF_CLASS,
+          count:0,
+          averageDB2BE:0,
+          averageBE2FE:0,
+          lastOccurrences:[]
+        };
+      });
+    };
+    $scope.clearData();
 
-    $scope.results =  {
-      'C#' : {
-        count:0,
-        averageDB2BE:0,
-        averageBE2FE:0,
-        lastOccurrences:[]
-      },
-      'Java' : {
-        count:0,
-        averageDB2BE:0,
-        averageBE2FE:0,
-        lastOccurrences:[]
-      },
-      'Python' : {
-        count:0,
-        averageDB2BE:0,
-        averageBE2FE:0,
-        lastOccurrences:[]
+    function isOnline(language){
+          return angular.isDefined($scope.results[language]) &&  $scope.results[language].isRunning === ON_CLASS;
+          }
+
+    $scope.switchWebsocket = function(language) {
+      var isTurnedOn = isOnline(language);
+      if(isTurnedOn) {
+        webSocketFactory.closeWs(language);
+        $scope.results[language] = {
+          isRunning: OFF_CLASS,
+          count:0,
+          averageDB2BE:0,
+          averageBE2FE:0,
+          lastOccurrences:[]
+        };
+      } else {
+        webSocketFactory.openWs(language);
+        $scope.results[language].isRunning = ON_CLASS;
       }
-
-
     };
 
 
