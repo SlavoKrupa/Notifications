@@ -4,6 +4,7 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import eventlet
 from eventlet.hubs import trampoline
 
+import iso8601
 import json
 from datetime import datetime
 
@@ -11,7 +12,7 @@ import tornado.ioloop
 import tornado.web
 import tornado.websocket
 
-from tornado.options import define, options, parse_command_line
+from tornado.options import define
 
 dbname = 'postgres'
 host = '127.0.0.1'
@@ -21,6 +22,8 @@ password = 'password'
 dsn = 'dbname=%s host=%s user=%s password=%s' % (dbname, host, user, password)
 
 define("port", default=5432, help="run on the given port", type=int)
+communication_queue = eventlet.Queue()
+eventlet.monkey_patch()
 
 
 def db_listen(q):
@@ -38,20 +41,33 @@ def db_listen(q):
             notify = cnn.notifies.pop()
             json_notification = json.loads(notify.payload)
             json_notification["backend_receiving"] = str(datetime.now())
+
+            # Hack with time zone
+            time_with_timezone = iso8601.parse_date(json_notification["db_creation"])
+            json_notification["db_creation"] = time_with_timezone.strftime("%Y.%m.%d %H:%M:%S.%f")
+
             q.put(json_notification)
 
 
+def send_data_to_ws(ws):
+    while 1:
+        notification = communication_queue.get()
+        ws.write_message(json.dumps(notification))
+
+    print 'Closing connection'
+
+
 class WSHandler(tornado.websocket.WebSocketHandler):
+    def __init__(self, app, request, **kwargs):
+        super(WSHandler, self).__init__(app, request, **kwargs)
+        self.thread = None
+
     def data_received(self, chunk):
         pass
 
     def open(self):
         print 'new connection'
-        q = eventlet.Queue()
-        eventlet.spawn(db_listen, q)
-        while 1:
-            notification = q.get()
-            self.write_message(json.dumps(notification))
+        self.thread = eventlet.spawn(send_data_to_ws, self)
 
     def on_message(self, message):
         print 'message received:  %s' % message
@@ -61,6 +77,7 @@ class WSHandler(tornado.websocket.WebSocketHandler):
 
     def on_close(self):
         print 'connection closed'
+        self.thread.kill()
 
     def check_origin(self, origin):
         return True
@@ -71,5 +88,6 @@ application = tornado.web.Application([
 ])
 
 if __name__ == "__main__":
+    eventlet.spawn(db_listen, communication_queue)
     application.listen(8081)
     tornado.ioloop.IOLoop.instance().start()
